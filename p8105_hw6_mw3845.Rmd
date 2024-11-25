@@ -1,0 +1,17 @@
+---
+title: "p8105_hw6_mw3845"
+author: "Minghe Wang"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Problem 1
+
+```{r Problem1}
+
+```
+
