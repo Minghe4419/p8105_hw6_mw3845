@@ -48,13 +48,19 @@ baltimore_glm =
   baltimore_df |> 
   glm(solved_case ~ victim_age + victim_race + victim_sex, data = _, family = binomial())
 
-baltimore_glm |> 
+baltimore_result = baltimore_glm |> 
   broom::tidy(
     exponentiate = TRUE,
     conf.int = TRUE
   ) |> 
   filter(term == "victim_sexMale") |>
-  select(term, estimate, conf.low, conf.high, p.value) |> 
+  select(term, estimate, conf.low, conf.high, p.value)
+
+baltimore_result |> 
   knitr::kable(digits = 4)
 ```
+
+We select `Baltimore, MD`'s data and fit into binary logistic regression model with `glm`.
+
+
 
