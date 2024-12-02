@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ggplot2)
 library(purrr)
+library(tidyr)
 ```
 
 # Problem 1
@@ -62,5 +63,56 @@ baltimore_result |>
 
 We select `Baltimore, MD`'s data and fit into binary logistic regression model with `glm`.
 
+```{r Problem3_glm_thru_cities}
+city_model = homicide_df %>% 
+  group_by(city_state) %>% 
+  nest() %>% 
+  mutate(
+    glm_model = map(
+      data,
+      ~ glm(solved_case ~ victim_age + victim_race + victim_sex, data = ., family = binomial())
+    )
+  ) 
 
+city_result = city_model %>% 
+  mutate(
+    tidy_glm_model = map(glm_model, broom::tidy)
+  ) %>% 
+  unnest(tidy_glm_model) %>% 
+  mutate(
+    OR = exp(estimate),
+    ci_lower = exp(estimate - 1.96 * std.error),
+    ci_upper = exp(estimate + 1.96 * std.error)
+  ) %>% 
+  filter(term == "victim_sexMale") %>%
+  select(
+    city_state,
+    OR,
+    ci_lower,
+    ci_upper,
+    p.value
+  )
+
+city_result %>% 
+  knitr::kable(digits = 4)
+
+city_result = city_result %>%
+  arrange(OR) %>%
+  mutate(city_state = factor(city_state, levels = city_state))
+
+ggplot(city_result, aes(x = OR, y = city_state)) +
+  geom_point() +
+  geom_errorbar(aes(xmin =  ci_lower, xmax =  ci_upper), width = 0.2) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "red") +
+  xlab("Adjusted Odds Ratio (Male vs Female Victims)") +
+  ylab("City, State") +
+  ggtitle("Adjusted Odds Ratios for Solving Homicides by City") +
+  theme_minimal()
+```
+
+# Problem 3
+
+```{r}
+
+```
 
