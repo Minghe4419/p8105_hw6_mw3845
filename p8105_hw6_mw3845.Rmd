@@ -116,7 +116,7 @@ For the adjusted odd ratio plot, we observe that the male victim committed homic
 
 # Problem 3
 
-```{r Problem3}
+```{r Problem3_data_cleaning}
 bwt_df = 
   read_csv("./data/birthweight.csv") |> 
   janitor::clean_names() |>
@@ -173,7 +173,7 @@ In the hypothesized model that we construct, the baby's measurement at birth and
 
 From the scatter plot of Residual vs. Prediction, we observe no specific pattern of how residuals are distributed, which can be considered as randomly dispersed around then 0 line. Thus we conclude that this it a goot fit that the model appropriately captures the relationship between predictors and the outcome.
 
-```{r}
+```{r Problem3_model_comparison}
 cv_df = 
   crossv_mc(bwt_df, 100)
 
