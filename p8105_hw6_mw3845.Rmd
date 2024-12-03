@@ -7,10 +7,12 @@ output: github_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(purrr)
 library(tidyr)
+library(modelr)
 ```
 
 # Problem 1
@@ -61,7 +63,7 @@ baltimore_result |>
   knitr::kable(digits = 4)
 ```
 
-We select `Baltimore, MD`'s data and fit into binary logistic regression model with `glm`.
+We select `Baltimore, MD`'s data and fit into binary logistic regression model with `glm`. We use variables `victim_age`, `victim_race`, `victim_sex` to make prediction on `solved_case`. By comparing victims' sex, we obtain estimated odd ratio for solving homicide `r pull(baltimore_result, estimate)` and 1 does not falls into the 95% confidence interval. It indicate that cases committed by male victims have less odd to be solved than cases committed by female; and the result is statistically significant.
 
 ```{r Problem3_glm_thru_cities}
 city_model = homicide_df %>% 
@@ -110,9 +112,94 @@ ggplot(city_result, aes(x = OR, y = city_state)) +
   theme_minimal()
 ```
 
+For the adjusted odd ratio plot, we observe that the male victim committed homicide are less likely to be solved than female committed homicides in most cities. We need to be careful for the cities with estimated confidence interval including 1 because it typically suggest that the result is not statistically significant at the 95% confidence level.
+
 # Problem 3
 
-```{r}
+```{r Problem3}
+bwt_df = 
+  read_csv("./data/birthweight.csv") |> 
+  janitor::clean_names() |>
+  mutate(
+    babysex = 
+        case_match(babysex,
+            1 ~ "male",
+            2 ~ "female"
+        ),
+    babysex = fct_infreq(babysex),
+    frace = 
+        case_match(frace,
+            1 ~ "white",
+            2 ~ "black", 
+            3 ~ "asian", 
+            4 ~ "puerto rican", 
+            8 ~ "other"),
+    frace = fct_infreq(frace),
+    mrace = 
+        case_match(mrace,
+            1 ~ "white",
+            2 ~ "black", 
+            3 ~ "asian", 
+            4 ~ "puerto rican",
+            8 ~ "other"),
+    mrace = fct_infreq(mrace),
+    malform = as.logical(malform))
+
+sapply(bwt_df, function(x) sum(is.na(x)))
 
 ```
+
+After importing and cleaning the birth weight data, there are `r nrow(bwt_df)` rows and `r ncol(bwt_df)` columns. We factored `babysex`, `frace`, `mrace`, `malform` in the dataset. The dataset also includes key variables like `blength`, `gaweeks`, `bhead`, etc; which are important for out future model fitting and comparison process. By checking for NA, we found there is no missing value in our cleaned dataset.
+
+```{r Problem3_hypothesized_model}
+hypothesis_model <- lm(bwt ~ gaweeks + babysex + ppbmi + smoken + mrace + wtgain, data = bwt_df)
+summary(hypothesis_model)
+
+bwt_df <- bwt_df %>%
+  add_predictions(hypothesis_model) %>%
+  add_residuals(hypothesis_model)
+
+# Plot Residuals vs. Fitted Values
+ggplot(bwt_df, aes(x = pred, y = resid)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Residuals vs. Fitted Values",
+       x = "Fitted Values (Predicted Birthweight)",
+       y = "Residuals") +
+  theme_minimal()
+```
+
+In the hypothesized model that we construct, the baby's measurement at birth and the mother's health information (`gaweeks`, `babysex`, `ppbmi`, `smoken`, `mrace`, `wtgain`) are included to predict the birth weight `bwt`. All variables are considered statistically significant according to the summary table.
+
+From the scatter plot of Residual vs. Prediction, we observe no specific pattern of how residuals are distributed, which can be considered as randomly dispersed around then 0 line. Thus we conclude that this it a goot fit that the model appropriately captures the relationship between predictors and the outcome.
+
+```{r}
+cv_df = 
+  crossv_mc(bwt_df, 100)
+
+cv_df = 
+  cv_df |> 
+  mutate(
+    hypothesis_mod  = map(train, \(df) lm(bwt ~ gaweeks + babysex + ppbmi + smoken + mrace + wtgain, data = df)),
+    main_effect_mod  = map(train, \(df) lm(bwt ~ blength + gaweeks, data = df)),
+    interaction_mod  = map(train, \(df) lm(bwt ~ (bhead + blength + babysex)^3, data = df))
+  ) |> 
+  mutate(
+    rmse_hypothesis = map2_dbl(hypothesis_mod, test, \(mod, df) rmse(model = mod, data = df)),
+    rmse_main_effect = map2_dbl(main_effect_mod, test, \(mod, df) rmse(model = mod, data = df)),
+    rmse_interact = map2_dbl(interaction_mod, test, \(mod, df) rmse(model = mod, data = df)))
+
+
+cv_df |> 
+  select(starts_with("rmse")) |> 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") |> 
+  mutate(model = fct_inorder(model)) |> 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+```
+
+The 3-way interaction model outperforms the other 2 models. This is align with our tuition because the 3-way interaction model can capture non-linear / complex relationships when making prediction on babies' birth weight. The main effect model outperform our initial hypothesized model might indicate that out hypothesized model containing more variables than the main effect model does might introduce noises to the relationship. While the `gaweeks` and `blength` are likely to be strong predicting variables, it is reasonable that the hypothesized model has highest prediction error in comparison.
 
